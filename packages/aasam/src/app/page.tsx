@@ -1,84 +1,205 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
-const slogans = [
-  "Turn chats into apps",
-  "Prompt. Ship. Repeat.",
-  "Build anything from a chat",
-  "Ideas → Apps, instantly",
-  "From zero to MVP in minutes",
-  "Your cofounder in the command line",
-  "Draft, iterate, deploy",
-  "Ship faster than you can type",
-  "Design in text, deliver in code",
-  "Dream it. Prompt it. Run it.",
-  "Chat-native app building",
-  "From prompt to product",
-  "One prompt, infinite apps",
-  "Stop scaffolding. Start shipping.",
-  "Prototype at the speed of thought",
-  "Make conversations executable"
+type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+type Position = { x: number; y: number };
+
+const GRID_SIZE = 20;
+const CELL_SIZE = 20;
+const INITIAL_SNAKE: Position[] = [
+  { x: 10, y: 10 },
+  { x: 9, y: 10 },
+  { x: 8, y: 10 },
 ];
+const INITIAL_DIRECTION: Direction = 'RIGHT';
+const GAME_SPEED = 150;
 
-export default function Landing() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(true);
+export default function SnakeGame() {
+  const [snake, setSnake] = useState<Position[]>(INITIAL_SNAKE);
+  const [direction, setDirection] = useState<Direction>(INITIAL_DIRECTION);
+  const [food, setFood] = useState<Position>({ x: 15, y: 15 });
+  const [gameOver, setGameOver] = useState(false);
+  const [score, setScore] = useState(0);
+  const [gameStarted, setGameStarted] = useState(false);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsVisible(false);
-      setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % slogans.length);
-        setIsVisible(true);
-      }, 400);
-    }, 2800);
-
-    return () => clearInterval(interval);
+  const generateFood = useCallback(() => {
+    const newFood = {
+      x: Math.floor(Math.random() * GRID_SIZE),
+      y: Math.floor(Math.random() * GRID_SIZE),
+    };
+    return newFood;
   }, []);
 
+  const resetGame = () => {
+    setSnake(INITIAL_SNAKE);
+    setDirection(INITIAL_DIRECTION);
+    setFood(generateFood());
+    setGameOver(false);
+    setScore(0);
+    setGameStarted(true);
+  };
+
+  const checkCollision = (head: Position, snakeBody: Position[]) => {
+    // Wall collision
+    if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+      return true;
+    }
+    // Self collision
+    for (let i = 0; i < snakeBody.length; i++) {
+      if (head.x === snakeBody[i].x && head.y === snakeBody[i].y) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const moveSnake = useCallback(() => {
+    if (gameOver || !gameStarted) return;
+
+    setSnake((prevSnake) => {
+      const head = { ...prevSnake[0] };
+
+      switch (direction) {
+        case 'UP':
+          head.y -= 1;
+          break;
+        case 'DOWN':
+          head.y += 1;
+          break;
+        case 'LEFT':
+          head.x -= 1;
+          break;
+        case 'RIGHT':
+          head.x += 1;
+          break;
+      }
+
+      if (checkCollision(head, prevSnake)) {
+        setGameOver(true);
+        setGameStarted(false);
+        return prevSnake;
+      }
+
+      const newSnake = [head, ...prevSnake];
+
+      // Check if food is eaten
+      if (head.x === food.x && head.y === food.y) {
+        setScore((prev) => prev + 10);
+        setFood(generateFood());
+      } else {
+        newSnake.pop();
+      }
+
+      return newSnake;
+    });
+  }, [direction, food, gameOver, gameStarted, generateFood]);
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!gameStarted && !gameOver && e.key.startsWith('Arrow')) {
+        setGameStarted(true);
+      }
+
+      switch (e.key) {
+        case 'ArrowUp':
+          setDirection((prev) => (prev !== 'DOWN' ? 'UP' : prev));
+          break;
+        case 'ArrowDown':
+          setDirection((prev) => (prev !== 'UP' ? 'DOWN' : prev));
+          break;
+        case 'ArrowLeft':
+          setDirection((prev) => (prev !== 'RIGHT' ? 'LEFT' : prev));
+          break;
+        case 'ArrowRight':
+          setDirection((prev) => (prev !== 'LEFT' ? 'RIGHT' : prev));
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [gameStarted, gameOver]);
+
+  useEffect(() => {
+    const gameLoop = setInterval(moveSnake, GAME_SPEED);
+    return () => clearInterval(gameLoop);
+  }, [moveSnake]);
+
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-black text-white">
-      {/* Enhanced animated aurora background layers */}
-      <div className="absolute inset-0 bg-aurora-layer-1" />
-      <div className="absolute inset-0 bg-aurora-layer-2" />
-      <div className="absolute inset-0 bg-aurora-layer-3" />
-      
-      {/* Floating particles overlay */}
-      <div className="absolute inset-0 bg-particles" />
-      
-      {/* Main content - centered */}
-      <main className="relative z-10 h-full flex flex-col items-center justify-center px-6">
-        <h1 className="text-center text-[clamp(28px,6vw,64px)] font-medium tracking-tight mb-4">
-          Turn Chats into Apps
-        </h1>
-        
-        {/* Rotating slogans */}
-        <div className="mt-4 h-8 md:h-10 overflow-hidden flex items-center justify-center">
-          <span
-            className={`inline-block text-center text-[clamp(18px,3vw,32px)] font-light transition-all duration-[400ms] ease-in-out ${
-              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
-            }`}
-          >
-            {slogans[currentIndex]}
-          </span>
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white flex items-center justify-center">
+      <div className="flex flex-col items-center gap-6">
+        <div className="text-center">
+          <h1 className="text-5xl font-bold mb-2">Snake Game</h1>
+          <p className="text-2xl">Score: {score}</p>
         </div>
-      </main>
-      
-      {/* Start Prompting arrow pointing left - bottom left */}
-      <div className="absolute left-6 md:left-8 bottom-[5%] z-20 flex items-center gap-3 arrow-point-left">
-        <div className="flex items-center gap-2 text-white/80 font-medium text-sm md:text-base">
-          <svg 
-            className="w-5 h-5 md:w-6 md:h-6 animate-bounce-horizontal" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span>Start prompting</span>
+
+        <div
+          className="relative bg-black/40 backdrop-blur-sm border-4 border-purple-500 rounded-lg shadow-2xl"
+          style={{
+            width: GRID_SIZE * CELL_SIZE,
+            height: GRID_SIZE * CELL_SIZE,
+          }}
+        >
+          {/* Snake */}
+          {snake.map((segment, index) => (
+            <div
+              key={index}
+              className="absolute bg-green-400 rounded-sm transition-all duration-75"
+              style={{
+                width: CELL_SIZE - 2,
+                height: CELL_SIZE - 2,
+                left: segment.x * CELL_SIZE,
+                top: segment.y * CELL_SIZE,
+                opacity: index === 0 ? 1 : 0.8,
+              }}
+            />
+          ))}
+
+          {/* Food */}
+          <div
+            className="absolute bg-red-500 rounded-full animate-pulse"
+            style={{
+              width: CELL_SIZE - 4,
+              height: CELL_SIZE - 4,
+              left: food.x * CELL_SIZE + 2,
+              top: food.y * CELL_SIZE + 2,
+            }}
+          />
+
+          {/* Game Over Overlay */}
+          {gameOver && (
+            <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-4xl font-bold mb-4">Game Over!</h2>
+                <p className="text-xl mb-6">Final Score: {score}</p>
+                <button
+                  onClick={resetGame}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors"
+                >
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Start Screen */}
+          {!gameStarted && !gameOver && (
+            <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-3xl font-bold mb-4">Ready to Play?</h2>
+                <p className="text-lg mb-2">Use arrow keys to move</p>
+                <p className="text-sm text-gray-400">Press any arrow key to start</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="text-center text-sm text-gray-300">
+          <p>Use ← ↑ → ↓ arrow keys to control the snake</p>
         </div>
       </div>
     </div>
   );
 }
+
